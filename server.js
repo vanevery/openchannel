@@ -1,6 +1,11 @@
-// Not used yet
-// var fs = require('fs');
-// var https = require('https');
+// For Let's Encrypt
+
+/*
+var express = require('express');
+var app = express();
+app.use(express.static('public'));
+app.listen(80);
+*/
 
 // HTTP Portion - Just redirect
 var http = require('http');
@@ -8,19 +13,19 @@ var httpServer = http.createServer(requestHandler);
 httpServer.listen(80);
 
 function requestHandler(req, res) {
-  	//res.writeHead(302, {'Location': 'https://open-channel.io'});
-  	res.end("Life is wonderful");
+  	res.writeHead(302, {'Location': 'https://open-channel.io'});
+	res.end();
+  	//res.end("Life is wonderful");
 }
 
 // Express Portion - https
-/*
 var https = require('https');
 var fs = require('fs'); // Using the filesystem module
 var url =  require('url');
 
 var credentials = {
-  key: fs.readFileSync('my-key.pem'),
-  cert: fs.readFileSync('my-cert.pem')
+  key: fs.readFileSync('/etc/letsencrypt/live/open-channel.io/privkey.pem'),
+  cert: fs.readFileSync('/etc/letsencrypt/live/open-channel.io/cert.pem')
 };
 
 var express = require('express');
@@ -59,6 +64,5 @@ peerserver.on('connection', function(id) {
 peerserver.on('disconnect', function(id) {
 	console.log("Disconnect: " + id);
 });
-*/
 
 
