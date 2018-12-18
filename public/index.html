@@ -162,7 +162,7 @@
 			
 			function initPeerJS() {
 				// The Peer Cloud Server doesn't seem to be operational, I setup a server on a Digital Ocean instance for our use, you can use that with the following constructor:
-				peer = new Peer({host: 'localhost', port: 9000, path: '/peerjs'});
+				peer = new Peer({host: 'open-channel.io', port: 443, secure: true, path: '/peerjs'});
 
 				// Get an ID from the PeerJS server
 				peer.on('open', function(id) {
