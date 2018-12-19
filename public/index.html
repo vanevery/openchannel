@@ -25,8 +25,11 @@
 			let channelDisplay = null;
 			let channelName = null;
 			let channelDisconnectButton = null;
+			let channelURL = null;
 
 			let pushToTalk = null;
+
+			let queryStringChannelName = null;
 		
 			window.addEventListener('load', function(evt) {
 
@@ -41,7 +44,10 @@
 				channelDisplay = document.getElementById("channel_display");
 				channelName = document.getElementById("channel_name");
 
-//getParameterByName
+				queryStringChannelName = getParameterByName("channel");
+				if (queryStringChannelName != null && queryStringChannelName != "") {
+					channelText.value = queryStringChannelName;
+				}
 				
 				channelButton = document.getElementById("channel_button");
 				channelButton.addEventListener('click', joinChannel);
@@ -55,6 +61,8 @@
 				pushToTalk = document.getElementById("push_to_talk");
 				pushToTalk.addEventListener('mousedown', unmuteStream);
 				pushToTalk.addEventListener('mouseup', muteStream);
+
+				channelURL = document.getElementById("channel_url");
 			}
 			
 			function joinChannel() {
@@ -127,6 +135,8 @@
 				// Handle UI changes only
 				channelText.value = "";
 				channelName.innerHTML = currentChannel;
+				channelURL.href = "https://open-channel.io/?channel=" + currentChannel;
+				channelURL.innerHTML = channelURL.href;
 				channelSelect.style.display = "none";
 				channelDisplay.style.display = "block";								
 			}
@@ -265,6 +275,7 @@
 				name = name.replace(/[\[\]]/g, '\\$&');
 				var regex = new RegExp('[?&]' + name + '(=([^&#]*)|&|#|$)'),
 					results = regex.exec(url);
+	  			console.log("getParameterByName", name, results, results[2]);
 				if (!results) return null;
 				if (!results[2]) return '';
 				return decodeURIComponent(results[2].replace(/\+/g, ' '));
@@ -302,7 +313,8 @@
 				<button id="create_channel_button">Create Channel</button>
 			</div>
 			<div id="channel_display">
-				You are connected to channel: <div id="channel_name">Channel Name</div>
+				You are connected to channel: <div id="channel_name">Channel Name</div><br />
+				Share this channel by sharing this URL: <a id="channel_url" href=""></a><br />
 				<button id="push_to_talk">Push to Talk</button>
 				<button id="channel_disconnect">Disconnect</button>
 			</div>
