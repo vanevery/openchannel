@@ -30,8 +30,17 @@ var credentials = {
 
 var express = require('express');
 var app = express();
+
+app.use(function(req,resp,next){
+    if (req.headers.host.indexOf("www") > -1) {
+        return resp.redirect(301, 'https://open-channel.io/');
+    } else {
+        return next();
+    }
+});
  
 app.use(express.static('public'));
+
  
 app.get('/', function(req, res, next) { res.redirect('/index.html'); });
  
