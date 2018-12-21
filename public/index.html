@@ -3,6 +3,9 @@
 		<script type="text/javascript" src="peer.min.js"></script>
 		<script type="text/javascript">
 
+			const STATUS_CONNECTED = "Connected";
+			const STATUS_DISCONNECTED = "Not Connected";
+
 			const ListChannelPeersCommand = "get channel peers";
 
 			let mystream = null;
@@ -26,6 +29,9 @@
 			let channelName = null;
 			let channelDisconnectButton = null;
 			let channelURL = null;
+			let channelStatusText = null;
+	
+			let channelStatus = STATUS_DISCONNECTED;
 
 			let pushToTalk = null;
 
@@ -63,6 +69,7 @@
 				pushToTalk.addEventListener('mouseup', muteStream);
 
 				channelURL = document.getElementById("channel_url");
+				channelStatusText = document.getElementById("channel_status");
 			}
 			
 			function joinChannel() {
@@ -75,7 +82,9 @@
 				// Call the main person
 				console.log("Calling main user " + currentChannel);
 				mainCall = peer.call(currentChannel, mystream);
-				mainCall.on('stream', handleCallStream);
+				mainCall.on('stream', function(remoteStream) {
+                                	handleCallStream(currentChannel, remoteStream);
+                                });
 				// Should setup disconnects here
 				
 				// Make a data connection with main person
@@ -119,7 +128,9 @@
 					if (!found && channelPeers[i] != mypeerid) {
 						console.log("Calling " + channelPeers[i]);
 						let call = peer.call(channelPeers[i], mystream);
-						call.on('stream', handleCallStream);
+						call.on('stream', function(remoteStream) {
+                                                	handleCallStream(channelPeers[i], remoteStream);
+                                        	});
 						// Should setup disconnects
 					}
 				}
@@ -161,13 +172,17 @@
 			
 			function channelDisconnect() {
 				channelName.innerHTML = "";
-				channelSelect.style.visibility = "block";
+				channelSelect.style.display = "block";
 				channelDisplay.style.display = "none";		
 				
 				
-				// Actually Disconnect
 				// Loop through connectedPeers and disconnect
+				for (let i = 0; i < connectedPeers.length; i++) {
+					connectedPeers[i].disconnect();
+				}
+
 				// Close out channelPeers
+				channelPeers.length = 0;
 			}
 			
 			function initPeerJS() {
@@ -216,6 +231,9 @@
 				
 				oaudioElement.onloadedmetadata = function(e) {
 					oaudioElement.play();
+					if (remotePeerId == currentChannel) {
+						updateChannelStatus(STATUS_CONNECTED);
+					}
 				};
 				
 				connectedPeers.push(remotePeerId);
@@ -281,6 +299,11 @@
 				return decodeURIComponent(results[2].replace(/\+/g, ' '));
 			}			
 
+			function updateChannelStatus(newStatus) {
+	  			channelStatus = newStatus;
+				channelStatusText.innerHTML = channelStatus;
+			}
+
 						
 		</script>
 		<style>
@@ -300,21 +323,24 @@
 	</head>
 	<body>
 		<h1>Open Channel</h1>
-		<p>Welcome to Open Channel.  This service enables anyone, anywhere to create a private audio channel between 2 or more people simply by running this webpage and entering an existing channel or creating a new one.</p>
+		<p>Welcome to Open Channel.  This service enables anyone, anywhere to create a private audio channel between 2 or more people simply by running this webpage and connecting to an existing channel or creating a new one and sharing that connection URL with others. If you </p>
 		<p>To use:
-			<ol>Enable your microphone when prompted</ol>
-			<ol>Enter the name of an existing or new channel below</ol>
-			
+			<ol>
+				<li>Enable your microphone when prompted</li>
+				<li>Enter the name of an existing channel and choosing "Connect" or clicking "Create Channel" and sharing the URL.</li>
+				<li>Once connected, to talk, push and hold down the "Push to Talk" button.</li>
+			</ol>
 
 		<div id="channel_div">
 			<div id="channel_select">
-				Join Channel Name: <input type="text" id="channel_text" value=""><button id="channel_button">Enter</button><br />
+				Join Channel Name: <input type="text" id="channel_text" value=""><button id="channel_button">Connect</button><br />
 				OR <br />
 				<button id="create_channel_button">Create Channel</button>
 			</div>
 			<div id="channel_display">
 				You are connected to channel: <div id="channel_name">Channel Name</div><br />
 				Share this channel by sharing this URL: <a id="channel_url" href=""></a><br />
+				<div id="channel_status">No Connection</div>
 				<button id="push_to_talk">Push to Talk</button>
 				<button id="channel_disconnect">Disconnect</button>
 			</div>
