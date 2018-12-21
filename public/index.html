@@ -17,7 +17,7 @@
 			let mainDataConnection = null;
 						
 			let channelPeers = [];
-			let connectedPeers = []; // Call objects
+			let connectedPeers = []; // Call objects/MediaConnection 
 			let connectedDataChannels = []; // Peer ids
 			
 			let currentChannel = null;
@@ -115,6 +115,11 @@
 					}
 					// Could have other incoming data in an else if
 				});
+
+				mainDataConnection.on('close', function() {
+					console.log("Main datachannel disconnect");
+					channelDisconnect();
+				});
 			}
 
 			function callChannelPeers() {
@@ -170,9 +175,14 @@
 						} // Could have other commands
 					});
 
-					connection.on('disconnect', function() {
-						console.log("Channel Host Dataconnection Disconnected");
-						channelDisconnect();
+					connection.on('close', function() {
+	  					console.log("data channel close: " + connection.peer);
+
+	  					for (let i = 0; i < connectedDataChannels[i]; i++) {
+							if (connectedDataChannels[i].peer == connection.peer) {
+								connectedDataChannels.splice(i, 1);
+	  						}
+	  					}
 					});
 				});				
 			}
@@ -184,11 +194,19 @@
 				
 				// Loop through connectedPeers and disconnect
 				for (let i = 0; i < connectedPeers.length; i++) {
-					connectedPeers[i].disconnect();
+					connectedPeers[i].close();
 				}
+
+	  			// Close data connection
+	  			for (let i = 0; i < connectedDataChannels.length; i++) {
+					connectedDataChannels[i].close();
+	  			}
 
 				// Close out channelPeers
 				channelPeers.length = 0;
+
+				// Close out connectedDataChannels
+	  			connectedDataChannels.length = 0;
 
 				updateChannelStatus(STATUS_DISCONNECTED);
 			}
