@@ -5,6 +5,7 @@
 
 			const STATUS_CONNECTED = "Connected";
 			const STATUS_DISCONNECTED = "Not Connected";
+			const STATUS_HOSTING_CHANNEL = "Hosting Channel";
 
 			const ListChannelPeersCommand = "get channel peers";
 
@@ -16,8 +17,8 @@
 			let mainDataConnection = null;
 						
 			let channelPeers = [];
-			let connectedPeers = [];
-			let connectedDataChannels = [];
+			let connectedPeers = []; // Call objects
+			let connectedDataChannels = []; // Peer ids
 			
 			let currentChannel = null;
 			
@@ -83,7 +84,7 @@
 				console.log("Calling main user " + currentChannel);
 				mainCall = peer.call(currentChannel, mystream);
 				mainCall.on('stream', function(remoteStream) {
-                                	handleCallStream(currentChannel, remoteStream);
+                                	handleCallStream(mainCall, remoteStream);
                                 });
 				// Should setup disconnects here
 				
@@ -121,7 +122,7 @@
 				for (let i = 0; i < channelPeers.length; i++) {
 					let found = false;
 					for (let j = 0; j < connectedPeers.length  && !found; j++) {
-						if (channelPeers[i] == connectedPeers[j]) {
+						if (channelPeers[i] == connectedPeers[j].peer) {
 							found = true;
 						}
 					}
@@ -129,7 +130,7 @@
 						console.log("Calling " + channelPeers[i]);
 						let call = peer.call(channelPeers[i], mystream);
 						call.on('stream', function(remoteStream) {
-                                                	handleCallStream(channelPeers[i], remoteStream);
+                                                	handleCallStream(call, remoteStream);
                                         	});
 						// Should setup disconnects
 					}
@@ -138,6 +139,7 @@
 			
 			function createChannel() {
 				currentChannel = mypeerid;
+				updateChannelStatus(STATUS_HOSTING_CHANNEL);
 				setupDataConnection();			
 				displayChannelInfo();
 			}
@@ -167,6 +169,11 @@
 							connection.send({"channelPeers":channelPeers});
 						} // Could have other commands
 					});
+
+					connection.on('disconnect', function() {
+						console.log("Channel Host Dataconnection Disconnected");
+						channelDisconnect();
+					});
 				});				
 			}
 			
@@ -175,7 +182,6 @@
 				channelSelect.style.display = "block";
 				channelDisplay.style.display = "none";		
 				
-				
 				// Loop through connectedPeers and disconnect
 				for (let i = 0; i < connectedPeers.length; i++) {
 					connectedPeers[i].disconnect();
@@ -183,6 +189,8 @@
 
 				// Close out channelPeers
 				channelPeers.length = 0;
+
+				updateChannelStatus(STATUS_DISCONNECTED);
 			}
 			
 			function initPeerJS() {
@@ -203,7 +211,7 @@
 					console.log("Got call");		
 					thecall.answer(mystream);
 					thecall.on('stream', function(remoteStream) {
-						handleCallStream(thecall.peer, remoteStream);
+						handleCallStream(thecall, remoteStream);
 					});
 					
 					if (currentChannel == mypeerid) {
@@ -220,11 +228,11 @@
 				// Send out to data connections
 			}
 			
-			function handleCallStream(remotePeerId, remoteStream) {				
+			function handleCallStream(theCall, remoteStream) {				
 				var oaudioElement = document.createElement('AUDIO');
 				
 				// Their peer id
-				oaudioElement.id = remotePeerId;
+				oaudioElement.id = theCall.peer;
 				
 				oaudioElement.srcObject = remoteStream;
 				oaudioElement.setAttribute("autoplay", "true");
@@ -236,7 +244,7 @@
 					}
 				};
 				
-				connectedPeers.push(remotePeerId);
+				connectedPeers.push(theCall);
 			}
 			
 			function requestUserMedia() {
@@ -293,10 +301,14 @@
 				name = name.replace(/[\[\]]/g, '\\$&');
 				var regex = new RegExp('[?&]' + name + '(=([^&#]*)|&|#|$)'),
 					results = regex.exec(url);
-	  			console.log("getParameterByName", name, results, results[2]);
-				if (!results) return null;
-				if (!results[2]) return '';
-				return decodeURIComponent(results[2].replace(/\+/g, ' '));
+	  			//console.log("getParameterByName", name, results, results[2]);
+	  			if (!results) {
+	  				return null;
+	  			} else if (!results[2]) {
+	  				return '';
+	  			} else {
+					return decodeURIComponent(results[2].replace(/\+/g, ' '));
+	  			}
 			}			
 
 			function updateChannelStatus(newStatus) {
@@ -340,7 +352,7 @@
 			<div id="channel_display">
 				You are connected to channel: <div id="channel_name">Channel Name</div><br />
 				Share this channel by sharing this URL: <a id="channel_url" href=""></a><br />
-				<div id="channel_status">No Connection</div>
+				<div>Channel Status: <div id="channel_status">No Connection</div></div>
 				<button id="push_to_talk">Push to Talk</button>
 				<button id="channel_disconnect">Disconnect</button>
 			</div>
