@@ -195,15 +195,20 @@
 				// Loop through connectedPeers and disconnect
 				for (let i = 0; i < connectedPeers.length; i++) {
 					connectedPeers[i].close();
+	  				//connectedPeers.splice(i, 1);
 				}
 
 	  			// Close data connection
 	  			for (let i = 0; i < connectedDataChannels.length; i++) {
 					connectedDataChannels[i].close();
+	  				//connectedDataChannels.splice(i, 1);
 	  			}
 
 				// Close out channelPeers
 				channelPeers.length = 0;
+
+	  			// Close out connectedPeers
+	  			connectedPeers.length = 0;
 
 				// Close out connectedDataChannels
 	  			connectedDataChannels.length = 0;
