@@ -239,7 +239,7 @@
 				
 				oaudioElement.onloadedmetadata = function(e) {
 					oaudioElement.play();
-					if (remotePeerId == currentChannel) {
+					if (theCall.peer == currentChannel) {
 						updateChannelStatus(STATUS_CONNECTED);
 					}
 				};
