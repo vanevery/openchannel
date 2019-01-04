@@ -39,7 +39,6 @@
 			let queryStringChannelName = null;
 		
 			window.addEventListener('load', function(evt) {
-
 				bindElements();
 				requestUserMedia();				
 			});	
@@ -68,6 +67,9 @@
 				pushToTalk = document.getElementById("push_to_talk");
 				pushToTalk.addEventListener('mousedown', unmuteStream);
 				pushToTalk.addEventListener('mouseup', muteStream);
+				pushToTalk.addEventListener('touchstart', unmuteStream, true);
+				pushToTalk.addEventListener('touchend', muteStream);
+  				pushToTalk.addEventListener("touchcancel", muteStream);
 
 				channelURL = document.getElementById("channel_url");
 				channelStatusText = document.getElementById("channel_status");
@@ -217,7 +219,6 @@
 			}
 			
 			function initPeerJS() {
-				// The Peer Cloud Server doesn't seem to be operational, I setup a server on a Digital Ocean instance for our use, you can use that with the following constructor:
 				peer = new Peer({host: 'open-channel.io', port: 443, secure: true, path: '/peerjs'});
 
 				// Get an ID from the PeerJS server
@@ -273,7 +274,7 @@
 			function requestUserMedia() {
 				let myaudio = document.getElementById('myaudio');
 
-				let constraints = { audio: true, video: false }
+				let constraints = { audio: true, video: false };
 
 				// Prompt the user for permission, get the stream
 				navigator.mediaDevices.getUserMedia(constraints).then(function(stream) {
@@ -353,12 +354,22 @@
 			#channel_display {
 				display: none;
 			}
+
+			.unselectable {
+				-webkit-touch-callout: none;
+    				-webkit-user-select: none;
+    				-khtml-user-select: none;
+    				-moz-user-select: none;
+    				-ms-user-select: none;
+    				-o-user-select: none;
+    				user-select: none;
+			}
 			
 		</style>
 	</head>
 	<body>
 		<h1>Open Channel</h1>
-		<p>Welcome to Open Channel.  This service enables anyone, anywhere to create a private audio channel between 2 or more people simply by running this webpage and connecting to an existing channel or creating a new one and sharing that connection URL with others. If you </p>
+		<p>Welcome to Open Channel.  This service enables anyone, anywhere to create a private audio channel between 2 or more people simply by running this webpage and connecting to an existing channel or creating a new one and sharing that connection URL with others.</p>
 		<p>To use:
 			<ol>
 				<li>Enable your microphone when prompted</li>
@@ -376,7 +387,7 @@
 				You are connected to channel: <div id="channel_name">Channel Name</div><br />
 				Share this channel by sharing this URL: <a id="channel_url" href=""></a><br />
 				<div>Channel Status: <div id="channel_status">No Connection</div></div>
-				<button id="push_to_talk">Push to Talk</button>
+				<button id="push_to_talk" class="unselectable">Push to Talk</button>
 				<button id="channel_disconnect">Disconnect</button>
 			</div>
 		</div>
