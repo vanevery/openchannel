@@ -51,7 +51,7 @@
 				
 				socket.on(NEW_CHANNEL_PEER, function(data) {	
 					console.log("Received new channel peers");		
-					addPeerToChannel(data);
+					addPeerToChannel(data, false); // Don't call
 				});
 				
 				socket.on(DISCONNECT_CHANNEL_PEER, function(data) {
@@ -106,6 +106,7 @@
 			}
 			
 			function initPeerJS() {
+				console.log("initPeerJS");
 				peer = new Peer({host: 'open-channel.io', port: 443, secure: true, path: '/peerjs'});
 
 				// Get an ID from the PeerJS server
@@ -133,9 +134,10 @@
 				});
 			}
 			
-			function addPeerToChannel(peerid) {
+			function addPeerToChannel(peerid, call) {
 				channelPeers.push(peerid);
-				if (mypeerid != null) {
+				
+				if (mypeerid != null && call) {
 					callChannelPeers();
 				}
 			}
@@ -155,12 +157,14 @@
 						break;
 					}
 				}				
-
+				
 				var elem = document.getElementById(peerid);
-				elem.parentNode.removeChild(elem);
+				if (elem) {
+					elem.parentNode.removeChild(elem);
+				}
 			}
 			
-			function handleCallStream(theCall, remoteStream) {				
+			function handleCallStream(theCall, remoteStream) {							
 				var oaudioElement = document.createElement('AUDIO');
 				
 				// Their peer id
@@ -172,6 +176,9 @@
 				oaudioElement.onloadedmetadata = function(e) {
 					oaudioElement.play();
 				};
+				
+//				oaudioElement.style.display = "none";
+				document.body.append(oaudioElement);
 				
 				connectedPeers.push(theCall);
 			}

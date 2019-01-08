@@ -64,7 +64,7 @@ httpsServer.listen(443);
 var ExpressPeerServer = require('peer').ExpressPeerServer;
 
 var options = {
-     debug: true
+     debug: false
 };
  
 //var peerserver = ExpressPeerServer(server, options);
@@ -99,15 +99,20 @@ io.on('connection', function (socket) {
 		socket.disconnect();	
 	}
 
+	console.log("New Connection: ");
+	console.log(connectedSockets.length);
+
 	socket.on('peerid', function(data) {
+		console.log(data);
 		socket.peerid = data;
 
 		let channelPeers = [];
-		for (let i = 0; i < connectedSockets; i++) {
+		for (let i = 0; i < connectedSockets.length; i++) {
 			if (connectedSockets[i].peerid) {
 				channelPeers.push(connectedSockets[i].peerid);
 			}
 		}
+		console.log(channelPeers.length);
 		socket.emit(CHANNEL_PEERS, channelPeers);
 
 		socket.broadcast.emit(NEW_CHANNEL_PEER, socket.peerid);	
