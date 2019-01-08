@@ -1,69 +1,72 @@
 <html>
 	<head>
+		<script type="text/javascript" src="/socket.io/socket.io.js"></script>
 		<script type="text/javascript" src="peer.min.js"></script>
 		<script type="text/javascript">
+		
+			let peer = null;
+			let mystream = null;
+			let mypeerid = null;
+			let socket = null;
 
 			const STATUS_CONNECTED = "Connected";
 			const STATUS_DISCONNECTED = "Not Connected";
-			const STATUS_HOSTING_CHANNEL = "Hosting Channel";
+			const STATUS_FULL = "Channel Full";
 
-			const ListChannelPeersCommand = "get channel peers";
+			const CHANNEL_PEERS = "CHANNEL_PEERS";
+			const NEW_CHANNEL_PEER = "NEW_CHANNEL_PEER";
+			const DISCONNECT_CHANNEL_PEER = "DISCONNECT_CHANNEL_PEER";
+			const CHANNEL_STATUS_MESSAGE = "CHANNEL_STATUS_MESSAGE";
 
-			let mystream = null;
-			let mypeerid = null;
-			
-			let peer = null;
-			let mainCall = null;
-			let mainDataConnection = null;
-						
 			let channelPeers = [];
 			let connectedPeers = []; // Call objects/MediaConnection 
-			let connectedDataChannels = []; // Peer ids
-			
-			let currentChannel = null;
-			
-			let channelSelect = null;
-			let channelText = null;
-			let channelButton = null;
-			let createChannelButton = null;
-			let channelDisplay = null;
-			let channelName = null;
-			let channelDisconnectButton = null;
-			let channelURL = null;
-			let channelStatusText = null;
-	
+				
 			let channelStatus = STATUS_DISCONNECTED;
 
 			let pushToTalk = null;
-
-			let queryStringChannelName = null;
+			let channelDisplay = null;
+			let statusDisplay = null;
 		
 			window.addEventListener('load', function(evt) {
 				bindElements();
 				requestUserMedia();				
 			});	
 			
+			function connectSocket() {
+				socket = io();			
+			
+				socket.on('connect', function() {
+					console.log("Socket Connected");
+					initPeerJS();
+				});		
+				
+				socket.on(CHANNEL_PEERS, function(data) {
+					console.log(data);
+					console.log("Received list of channel peers");
+					channelPeers = data;
+					if (mypeerid != null) {
+						callChannelPeers();
+					}
+				});
+				
+				socket.on(NEW_CHANNEL_PEER, function(data) {	
+					console.log("Received new channel peers");		
+					addPeerToChannel(data);
+				});
+				
+				socket.on(DISCONNECT_CHANNEL_PEER, function(data) {
+					console.log("Disconnect channel peer");
+					removePeerFromChannel(data);
+				});
+				
+				socket.on(CHANNEL_STATUS_MESSAGE, function(data) {
+					console.log(CHANNEL_STATUS_MESSAGE, data);
+					
+				});
+			}
+			
 			function bindElements() {
 
-				channelSelect = document.getElementById("channel_select");
-				channelText = document.getElementById("channel_text");
-				channelDisplay = document.getElementById("channel_display");
-				channelName = document.getElementById("channel_name");
-
-				queryStringChannelName = getParameterByName("channel");
-				if (queryStringChannelName != null && queryStringChannelName != "") {
-					channelText.value = queryStringChannelName;
-				}
-				
-				channelButton = document.getElementById("channel_button");
-				channelButton.addEventListener('click', joinChannel);
-				
-				createChannelButton = document.getElementById("create_channel_button");
-				createChannelButton.addEventListener('click', createChannel);
-				
-				channelDisconnectButton = document.getElementById("channel_disconnect");
-				channelDisconnectButton.addEventListener('click', channelDisconnect);
-				
 				pushToTalk = document.getElementById("push_to_talk");
 				pushToTalk.addEventListener('mousedown', unmuteStream);
 				pushToTalk.addEventListener('mouseup', muteStream);
@@ -71,59 +74,10 @@
 				pushToTalk.addEventListener('touchend', muteStream);
   				pushToTalk.addEventListener("touchcancel", muteStream);
 
-				channelURL = document.getElementById("channel_url");
-				channelStatusText = document.getElementById("channel_status");
+				channelDisplay = document.getElementById("channel_display");
+				statusDisplay = document.getElementById("status_display");
 			}
 			
-			function joinChannel() {
-				console.log("Joining channel " + channelText.value);
-			
-				currentChannel = channelText.value;
-			
-				displayChannelInfo();
-								
-				// Call the main person
-				console.log("Calling main user " + currentChannel);
-				mainCall = peer.call(currentChannel, mystream);
-				mainCall.on('stream', function(remoteStream) {
-                                	handleCallStream(mainCall, remoteStream);
-                                });
-				// Should setup disconnects here
-				
-				// Make a data connection with main person
-				setupMainDataConnection();
-			}
-			
-			function setupMainDataConnection() {
-				console.log("Setting up main data connection");
-			
-				mainDataConnection = peer.connect(currentChannel);
-				
-				mainDataConnection.on('open', function(data) {
-					console.log("Data connection open, asking for list of channel peers");
-					mainDataConnection.send(ListChannelPeersCommand);
-				});
-
-				mainDataConnection.on('data', function(data) {
-					console.log(data);
-					if (data.channelPeers) {
-						console.log("Received list of channel peers");
-						channelPeers = data.channelPeers;
-						callChannelPeers();
-					} else if (data.newChannelPeer) {
-						channelPeers.push(data.newChannelPeer);
-					} else if (data.removeChannelPeer) {
-						// Remove from the array, they left
-					}
-					// Could have other incoming data in an else if
-				});
-
-				mainDataConnection.on('close', function() {
-					console.log("Main datachannel disconnect");
-					channelDisconnect();
-				});
-			}
-
 			function callChannelPeers() {
 				console.log("Calling channel peers");
 				for (let i = 0; i < channelPeers.length; i++) {
@@ -137,85 +91,18 @@
 						console.log("Calling " + channelPeers[i]);
 						let call = peer.call(channelPeers[i], mystream);
 						call.on('stream', function(remoteStream) {
-                                                	handleCallStream(call, remoteStream);
-                                        	});
+                        	handleCallStream(call, remoteStream);
+                        });
 						// Should setup disconnects
 					}
 				}
-			}
-			
-			function createChannel() {
-				currentChannel = mypeerid;
-				updateChannelStatus(STATUS_HOSTING_CHANNEL);
-				setupDataConnection();			
+				channelStatus = STATUS_CONNECTED;
 				displayChannelInfo();
 			}
-			
+						
 			function displayChannelInfo() {
-				// Handle UI changes only
-				channelText.value = "";
-				channelName.innerHTML = currentChannel;
-				channelURL.href = "https://open-channel.io/?channel=" + currentChannel;
-				channelURL.innerHTML = channelURL.href;
-				channelSelect.style.display = "none";
-				channelDisplay.style.display = "block";								
-			}
-			
-			function setupDataConnection() {
-				// If it is our own channel, we are a server so set that up
-
-				peer.on('connection', function(connection) {
-					connectedDataChannels.push(connection);
-					
-					connection.on('open', function() {
-						console.log("New data connection established");
-					});
-					
-					connection.on('data', function(incomingData) {
-						if (incomingData == ListChannelPeersCommand) {
-							connection.send({"channelPeers":channelPeers});
-						} // Could have other commands
-					});
-
-					connection.on('close', function() {
-	  					console.log("data channel close: " + connection.peer);
-
-	  					for (let i = 0; i < connectedDataChannels[i]; i++) {
-							if (connectedDataChannels[i].peer == connection.peer) {
-								connectedDataChannels.splice(i, 1);
-	  						}
-	  					}
-					});
-				});				
-			}
-			
-			function channelDisconnect() {
-				channelName.innerHTML = "";
-				channelSelect.style.display = "block";
-				channelDisplay.style.display = "none";		
-				
-				// Loop through connectedPeers and disconnect
-				for (let i = 0; i < connectedPeers.length; i++) {
-					connectedPeers[i].close();
-	  				//connectedPeers.splice(i, 1);
-				}
-
-	  			// Close data connection
-	  			for (let i = 0; i < connectedDataChannels.length; i++) {
-					connectedDataChannels[i].close();
-	  				//connectedDataChannels.splice(i, 1);
-	  			}
-
-				// Close out channelPeers
-				channelPeers.length = 0;
-
-	  			// Close out connectedPeers
-	  			connectedPeers.length = 0;
-
-				// Close out connectedDataChannels
-	  			connectedDataChannels.length = 0;
-
-				updateChannelStatus(STATUS_DISCONNECTED);
+				channelDisplay.style.display = "block";	
+				statusDisplay.innerHTML = channelStatus;							
 			}
 			
 			function initPeerJS() {
@@ -223,8 +110,14 @@
 
 				// Get an ID from the PeerJS server
 				peer.on('open', function(id) {
-				  console.log('My peer ID is: ' + id);
-				  mypeerid = id;
+					console.log('My peer ID is: ' + id);
+					mypeerid = id;
+					
+					socket.emit('peerid', mypeerid);
+
+					if (channelPeers.length > 0) {
+						callChannelPeers();
+					}
 				});
 
 				peer.on('error', function(err) {
@@ -237,19 +130,34 @@
 					thecall.on('stream', function(remoteStream) {
 						handleCallStream(thecall, remoteStream);
 					});
-					
-					if (currentChannel == mypeerid) {
-						// It's my channel
-						// Add peer to channel
-						addPeerToChannel(thecall.peer);
-					}
 				});
 			}
 			
 			function addPeerToChannel(peerid) {
 				channelPeers.push(peerid);
+				if (mypeerid != null) {
+					callChannelPeers();
+				}
+			}
+			
+			function removePeerFromChannel(peerid) {
+				// Remove/Disconnect
+				let i = channelPeers.indexOf(peerid);
+				if (i > -1) {
+					channelPeers.splice(i, 1);
+				}
 				
-				// Send out to data connections
+				let found = false;
+				for (let j = 0; j < connectedPeers.length; j++) {
+					if (peerid == connectedPeers[j].peer) {
+						connectedPeers[j].close();
+						connectedPeers.splice(j, 1);
+						break;
+					}
+				}				
+
+				var elem = document.getElementById(peerid);
+				elem.parentNode.removeChild(elem);
 			}
 			
 			function handleCallStream(theCall, remoteStream) {				
@@ -263,9 +171,6 @@
 				
 				oaudioElement.onloadedmetadata = function(e) {
 					oaudioElement.play();
-					if (theCall.peer == currentChannel) {
-						updateChannelStatus(STATUS_CONNECTED);
-					}
 				};
 				
 				connectedPeers.push(theCall);
@@ -288,7 +193,7 @@
 					myaudio.onloadedmetadata = function(e) {
 						myaudio.play();
 						muteStream();
-						initPeerJS();
+						connectSocket();
 					};
 				})
 				.catch(function(err) {
@@ -300,13 +205,11 @@
 			
 			function unmuteStream() {
 				if (mystream != null) {
-					
 					var audioTracks = mystream.getAudioTracks();
 					for (var i = 0, l = audioTracks.length; i < l; i++) {
 						audioTracks[i].enabled = true;
 						console.log("enabled audio track " + i);
 					}			
-					
 				}
 			}
 			
@@ -320,37 +223,13 @@
 				}
 			}
 			
-			function getParameterByName(name, url) {
-				if (!url) url = window.location.href;
-				name = name.replace(/[\[\]]/g, '\\$&');
-				var regex = new RegExp('[?&]' + name + '(=([^&#]*)|&|#|$)'),
-					results = regex.exec(url);
-	  			//console.log("getParameterByName", name, results, results[2]);
-	  			if (!results) {
-	  				return null;
-	  			} else if (!results[2]) {
-	  				return '';
-	  			} else {
-					return decodeURIComponent(results[2].replace(/\+/g, ' '));
-	  			}
-			}			
-
-			function updateChannelStatus(newStatus) {
-	  			channelStatus = newStatus;
-				channelStatusText.innerHTML = channelStatus;
-			}
-
 						
 		</script>
 		<style>
 			#myaudio {
 				display: none;
 			}
-			
-			#channel_select {
-				display: block;
-			}
-			
+						
 			#channel_display {
 				display: none;
 			}
@@ -365,31 +244,29 @@
     				user-select: none;
 			}
 			
+			#push_to_talk {
+				width: 100%;
+				height: 75%;
+				font-size: x-large;
+
+			}
+			
 		</style>
 	</head>
 	<body>
 		<h1>Open Channel</h1>
-		<p>Welcome to Open Channel.  This service enables anyone, anywhere to create a private audio channel between 2 or more people simply by running this webpage and connecting to an existing channel or creating a new one and sharing that connection URL with others.</p>
+<!-- 
+		<p>Welcome to Open Channel</p>
 		<p>To use:
 			<ol>
 				<li>Enable your microphone when prompted</li>
-				<li>Enter the name of an existing channel and choosing "Connect" or clicking "Create Channel" and sharing the URL.</li>
 				<li>Once connected, to talk, push and hold down the "Push to Talk" button.</li>
 			</ol>
+ -->
 
-		<div id="channel_div">
-			<div id="channel_select">
-				Join Channel Name: <input type="text" id="channel_text" value=""><button id="channel_button">Connect</button><br />
-				OR <br />
-				<button id="create_channel_button">Create Channel</button>
-			</div>
-			<div id="channel_display">
-				You are connected to channel: <div id="channel_name">Channel Name</div><br />
-				Share this channel by sharing this URL: <a id="channel_url" href=""></a><br />
-				<div>Channel Status: <div id="channel_status">No Connection</div></div>
-				<button id="push_to_talk" class="unselectable">Push to Talk</button>
-				<button id="channel_disconnect">Disconnect</button>
-			</div>
+		<div id="channel_display">
+			<div>Status: <div id="status_display">Not Connected</div></div>
+			<button id="push_to_talk" class="unselectable">Push to Talk</button>
 		</div>
 		
 		<audio muted id="myaudio"></audio>

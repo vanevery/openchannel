@@ -1,3 +1,14 @@
+const STATUS_CONNECTED = "Connected";
+const STATUS_DISCONNECTED = "Not Connected";
+const STATUS_FULL = "Channel Full";
+
+const CHANNEL_PEERS = "CHANNEL_PEERS";
+const NEW_CHANNEL_PEER = "NEW_CHANNEL_PEER";
+const DISCONNECT_CHANNEL_PEER = "DISCONNECT_CHANNEL_PEER";
+const CHANNEL_STATUS_MESSAGE = "CHANNEL_STATUS_MESSAGE";
+
+const MAX_USERS = 10;
+
 // For Let's Encrypt
 
 /*
@@ -47,7 +58,6 @@ app.get('/', function(req, res, next) { res.redirect('/index.html'); });
 //var server = app.listen(80);
 var httpsServer = https.createServer(credentials, app);
 httpsServer.listen(443);
- 
 
 // Peer JS Portion
 
@@ -74,4 +84,42 @@ peerserver.on('disconnect', function(id) {
 	console.log("Disconnect: " + id);
 });
 
+// Socket.io Portion
+
+let connectedSockets = [];
+
+var io = require('socket.io')(httpsServer);
+
+io.on('connection', function (socket) {
+	if (connectedSockets.length < MAX_USERS) {
+		connectedSockets.push(socket);
+	} else {
+		// Send message that channel is full	
+		socket.emit(CHANNEL_STATUS_MESSAGE, STATUS_FULL);
+		socket.disconnect();	
+	}
+
+	socket.on('peerid', function(data) {
+		socket.peerid = data;
+
+		let channelPeers = [];
+		for (let i = 0; i < connectedSockets; i++) {
+			if (connectedSockets[i].peerid) {
+				channelPeers.push(connectedSockets[i].peerid);
+			}
+		}
+		socket.emit(CHANNEL_PEERS, channelPeers);
+
+		socket.broadcast.emit(NEW_CHANNEL_PEER, socket.peerid);	
+	});
+	
+	socket.on('disconnect', function() {
+		var indexToRemove = connectedSockets.indexOf(socket);
+		if (indexToRemove > -1) {
+			connectedSockets.splice(indexToRemove, 1);
+		}
+		
+		socket.broadcast.emit(DISCONNECT_CHANNEL_PEER, socket.peerid);	
+	});	
+});
 
