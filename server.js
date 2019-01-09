@@ -8,6 +8,15 @@ const DISCONNECT_CHANNEL_PEER = "DISCONNECT_CHANNEL_PEER";
 const CHANNEL_STATUS_MESSAGE = "CHANNEL_STATUS_MESSAGE";
 
 const MAX_USERS = 10;
+const MAX_TIME = 10 * 60 * 1000;
+
+// For Testing
+//const MAX_TIME = 5000;
+
+function log(toLog) {
+	console.log(Date.now() + " " + toLog);
+}
+
 
 // For Let's Encrypt
 
@@ -73,15 +82,11 @@ var peerserver = ExpressPeerServer(httpsServer, options);
 app.use('/peerjs', peerserver);
 
 peerserver.on('connection', function(id) { 
-	console.log("Connection: " + id);
-});
-
-peerserver.on('connection', function(id) { 
-	console.log("Connection: " + id);
+	log("Peer Connection: " + id);
 });
 
 peerserver.on('disconnect', function(id) {
-	console.log("Disconnect: " + id);
+	log("Peer Disconnect: " + id);
 });
 
 // Socket.io Portion
@@ -99,12 +104,18 @@ io.on('connection', function (socket) {
 		socket.disconnect();	
 	}
 
-	console.log("New Connection: ");
-	console.log(connectedSockets.length);
+	log("New Connection: socket.id: " + socket.id);
+	log("Connected Sockets: " + connectedSockets.length);
 
 	socket.on('peerid', function(data) {
-		console.log(data);
+		log(socket.id + " peerid: " + data);
 		socket.peerid = data;
+		
+		socket.startTime = Date.now();
+		socket.maxTimeTimeout = setTimeout(function() {
+			log(socket.id + " timeout");
+			socket.disconnect(true);
+		}, MAX_TIME);
 
 		let channelPeers = [];
 		for (let i = 0; i < connectedSockets.length; i++) {
@@ -112,13 +123,17 @@ io.on('connection', function (socket) {
 				channelPeers.push(connectedSockets[i].peerid);
 			}
 		}
-		console.log(channelPeers.length);
+		log("Sending " + channelPeers.length + " channelPeers");
 		socket.emit(CHANNEL_PEERS, channelPeers);
 
 		socket.broadcast.emit(NEW_CHANNEL_PEER, socket.peerid);	
 	});
 	
 	socket.on('disconnect', function() {
+		log(socket.id + " disconnect ");
+		 
+		clearTimeout(socket.maxTimeTimeout);
+	
 		var indexToRemove = connectedSockets.indexOf(socket);
 		if (indexToRemove > -1) {
 			connectedSockets.splice(indexToRemove, 1);

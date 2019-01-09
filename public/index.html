@@ -40,6 +40,11 @@
 					initPeerJS();
 				});		
 				
+				socket.on('disconnect', function() {
+					console.log("Socket Disconnected");
+					disconnectEverything();
+				});
+				
 				socket.on(CHANNEL_PEERS, function(data) {
 					console.log(data);
 					console.log("Received list of channel peers");
@@ -51,7 +56,7 @@
 				
 				socket.on(NEW_CHANNEL_PEER, function(data) {	
 					console.log("Received new channel peers");		
-					addPeerToChannel(data, false); // Don't call
+					addPeerToChannel(data, false); // Don't call, they will call us
 				});
 				
 				socket.on(DISCONNECT_CHANNEL_PEER, function(data) {
@@ -76,6 +81,7 @@
 
 				channelDisplay = document.getElementById("channel_display");
 				statusDisplay = document.getElementById("status_display");
+				statsDisplay = document.getElementById("stats");
 			}
 			
 			function callChannelPeers() {
@@ -88,12 +94,18 @@
 						}
 					}
 					if (!found && channelPeers[i] != mypeerid) {
+
 						console.log("Calling " + channelPeers[i]);
+
 						let call = peer.call(channelPeers[i], mystream);
+
 						call.on('stream', function(remoteStream) {
                         	handleCallStream(call, remoteStream);
                         });
-						// Should setup disconnects
+                        
+                        call.on('close', function() {
+                        	handleCallClose(call);
+                        });
 					}
 				}
 				channelStatus = STATUS_CONNECTED;
@@ -103,6 +115,20 @@
 			function displayChannelInfo() {
 				channelDisplay.style.display = "block";	
 				statusDisplay.innerHTML = channelStatus;							
+			}
+			
+			function disconnectEverything() {
+				if (socket && socket.connected) {
+					socket.disconnect();
+				}
+				
+				if (peer && !peer.disconnected) {
+					peer.disconnect(); // Leaves media streams intact but disconnects from server
+					//peer.destroy();
+				}
+				
+				channelStatus = STATUS_DISCONNECTED;
+				displayChannelInfo();
 			}
 			
 			function initPeerJS() {
@@ -123,6 +149,18 @@
 
 				peer.on('error', function(err) {
 				  console.log(err);
+				  
+				  
+				});
+				
+				peer.on('disconnected', function() {
+					console.log("Peer disconnected from server");
+					disconnectEverything();
+				})
+				
+				peer.on('close', function() {
+					console.log("Peer connection closed");
+					disconnectEverything();
 				});
 								
 				peer.on('call', function(thecall) {
@@ -134,34 +172,52 @@
 				});
 			}
 			
-			function addPeerToChannel(peerid, call) {
+			function addPeerToChannel(peerid, doCall) {
 				channelPeers.push(peerid);
 				
-				if (mypeerid != null && call) {
+				if (mypeerid != null && doCall) {
 					callChannelPeers();
 				}
 			}
 			
 			function removePeerFromChannel(peerid) {
+				console.log("Remove peer: " + peerid);
+			
 				// Remove/Disconnect
 				let i = channelPeers.indexOf(peerid);
 				if (i > -1) {
+					console.log("Removed peer: " + peerid + " from channelPeers");
 					channelPeers.splice(i, 1);
+					console.log("Channel peers length: " + channelPeers.length);
 				}
 				
 				let found = false;
 				for (let j = 0; j < connectedPeers.length; j++) {
 					if (peerid == connectedPeers[j].peer) {
-						connectedPeers[j].close();
+						console.log("Closing connection to " + connectedPeers[j].peer);
+						if (connectedPeers[j].open) {
+							connectedPeers[j].close();
+						}
 						connectedPeers.splice(j, 1);
+						console.log("Connected peers length: " + connectedPeers.length); 
 						break;
 					}
 				}				
 				
+				removeElement(peerid);
+			}
+			
+			function removeElement(peerid) {
 				var elem = document.getElementById(peerid);
 				if (elem) {
+					console.log("Removing " + peerid + " from page");
 					elem.parentNode.removeChild(elem);
 				}
+			}
+			
+			function handleCallClose(theCall) {
+				console.log("handleCallClose " + theCall.peer);
+				removePeerFromChannel(theCall.peer);
 			}
 			
 			function handleCallStream(theCall, remoteStream) {							
@@ -230,6 +286,11 @@
 				}
 			}
 			
+			function displayStats(statsToDisplay) {
+				console.log(statsToDisplay);
+				statDisplay.innerHTML = statsToDisplay;
+			}
+			
 						
 		</script>
 		<style>
@@ -258,10 +319,18 @@
 
 			}
 			
+			#title {
+				text-align: center;
+			}
+			
+			#status {
+				text-align: center;
+			}
+			
 		</style>
 	</head>
 	<body>
-		<h1>Open Channel</h1>
+		<h1 id="title">Open Channel</h1>
 <!-- 
 		<p>Welcome to Open Channel</p>
 		<p>To use:
@@ -272,11 +341,17 @@
  -->
 
 		<div id="channel_display">
-			<div>Status: <div id="status_display">Not Connected</div></div>
+			<div id="status">
+				Status: <span id="status_display">Not Connected</span>
+				<div id="stats"></div>		
+		
+			</div>
 			<button id="push_to_talk" class="unselectable">Push to Talk</button>
 		</div>
 		
 		<audio muted id="myaudio"></audio>
-	
+<!-- 
+		<div id="footer"><a href="/about.html">About</a></div>
+ -->
 	</body>
 </html>
